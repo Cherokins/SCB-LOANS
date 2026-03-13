@@ -446,6 +446,12 @@
             color: #065f46;
         }
         
+        .status-qualified {
+            background: #cffafe;
+            border: 1px solid #b6e9f5;
+            color: #0e4b62;
+        }
+        
         .lenders-bar {
             background: #f8fafc;
             padding: 20px;
@@ -822,6 +828,28 @@
             margin-bottom: 20px;
         }
         
+        .admin-filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .admin-filters input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .admin-filters button {
+            padding: 10px 20px;
+            background: #0B4F6C;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
         .applications-list {
             max-height: 400px;
             overflow-y: auto;
@@ -843,6 +871,25 @@
             border-left: 4px solid #10b981;
         }
         
+        .application-item.qualified {
+            border-left: 4px solid #0B4F6C;
+        }
+        
+        .application-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .application-details span {
+            font-size: 0.9em;
+        }
+        
+        .application-details strong {
+            color: #333;
+        }
+        
         .admin-actions {
             display: flex;
             gap: 10px;
@@ -855,11 +902,16 @@
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            font-size: 0.9em;
         }
         
         .admin-btn.approve {
             background: #10b981;
             color: white;
+        }
+        
+        .admin-btn.approve:hover {
+            background: #059669;
         }
     </style>
 </head>
@@ -874,20 +926,25 @@
         <div class="form-section">
             <div class="form-group">
                 <label>National ID Number</label>
-                <input type="text" id="idNumber" placeholder="Enter your ID number" oninput="validateIdNumber(); checkIdPhoneBinding()">
+                <input type="text" id="idNumber" placeholder="Enter your ID number" oninput="validateIdNumber(); checkExistingUserDelayed()">
                 <div class="validation-message" id="idValidation">Please enter numbers only</div>
             </div>
             
             <div class="form-group">
-                <label>M-Pesa Registered Number</label>
-                <input type="tel" id="phoneNumber" placeholder="e.g., 0712345678" maxlength="10" oninput="validatePhoneNumber(); checkIdPhoneBinding()">
-                <div class="validation-message" id="phoneValidation">Please enter a valid Kenyan phone number (07... or 01...)</div>
+                <label>Safaricom M-Pesa Number</label>
+                <input type="tel" id="phoneNumber" placeholder="e.g., 0712345678" maxlength="10" oninput="validatePhoneNumber(); checkExistingUserDelayed()">
+                <div class="validation-message" id="phoneValidation">Please enter a valid Safaricom number (07... or 01...)</div>
             </div>
             
             <!-- ID-Phone Binding Error Message -->
             <div class="binding-error" id="bindingError">
                 <strong>⚠️ Identity Mismatch Detected</strong>
                 <p id="bindingErrorMessage"></p>
+            </div>
+            
+            <div class="verification-notice">
+                <strong>📱 Safaricom Only</strong>
+                <p>Only Safaricom numbers are accepted for M-Pesa payments. Numbers must start with 07 or 01 (10 digits total). Airtel, Telkom, and other networks are not supported.</p>
             </div>
             
             <div class="verification-notice">
@@ -898,19 +955,46 @@
             <div class="consent-box">
                 <label>
                     <input type="checkbox" id="consentCheckbox">
-                    <span>I confirm that the phone number provided is registered in my name matching my ID details. I consent to SCB Quick Loans verifying this information with service providers.</span>
+                    <span>I confirm that the phone number provided is a Safaricom number registered in my name matching my ID details. I consent to SCB Quick Loans verifying this information with service providers.</span>
                 </label>
                 <small>This verification is mandatory and protects both you and the lender from identity fraud.</small>
             </div>
         </div>
         
-        <!-- Status Message -->
+        <!-- Status Message - Shows application status for returning users -->
         <div class="status-message" id="statusMessage">
             <h3 id="statusTitle"></h3>
             <p id="statusText"></p>
         </div>
         
-        <!-- Scan Section -->
+        <!-- Qualified Status Card (for returning users who scanned but haven't applied) -->
+        <div class="result-card" id="qualifiedStatusCard">
+            <div class="result-header">
+                <h3>✅ You're Pre-Qualified!</h3>
+                <span class="fee-info">Processing Fee: KSh <span id="qualifiedFeeAmount">0</span></span>
+            </div>
+            <div class="qualified-amount" id="qualifiedAmount">KSh 0</div>
+            <div class="credit-score-text" id="qualifiedMessage">You've already checked your eligibility</div>
+            
+            <div class="loan-terms-card">
+                <h4>📋 Your Loan Terms</h4>
+                <div class="terms-grid">
+                    <div class="term-item">
+                        <div class="term-label">Interest Rate (p.m.)</div>
+                        <div class="term-value highlight" id="qualifiedInterestRate">9%</div>
+                    </div>
+                    <div class="term-item">
+                        <div class="term-label">Max Tenure</div>
+                        <div class="term-value">12 months</div>
+                    </div>
+                </div>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="apply-btn" id="qualifiedApplyBtn" onclick="openPaymentModal()" style="width: auto; padding: 12px 30px; margin: 0;">PROCEED TO APPLICATION</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Scan Section (for new users) -->
         <div class="scan-section" id="scanSection">
             <button class="scan-btn" id="scanBtn" onclick="startScanning()" disabled>
                 CHECK YOUR ELIGIBILITY
@@ -922,7 +1006,7 @@
                     <span class="fee-info">Processing Fee: KSh <span id="feeAmount">0</span></span>
                 </div>
                 
-                <div class="qualified-amount" id="qualifiedAmount">KSh 0</div>
+                <div class="qualified-amount" id="newQualifiedAmount">KSh 0</div>
                 <div class="credit-score-text" id="creditMessage">Based on your financial profile</div>
                 
                 <!-- Fair & Flexible Loan Terms Card -->
@@ -1132,6 +1216,10 @@
     <!-- Admin Panel - Hidden -->
     <div class="admin-panel" id="adminPanel">
         <h3>Applications Dashboard</h3>
+        <div class="admin-filters">
+            <input type="text" id="adminSearch" placeholder="Search by ID or Phone..." oninput="filterApplications()">
+            <button onclick="refreshApplications()">Refresh</button>
+        </div>
         <div class="applications-list" id="applicationsList"></div>
     </div>
 
@@ -1220,6 +1308,58 @@
             return app;
         });
         localStorage.setItem('scb_applications', JSON.stringify(applications));
+
+        // ================ SAFARICOM VALIDATION ================
+        // Strict Safaricom prefixes based on official sources [citation:3][citation:4]
+        
+        function isSafaricomNumber(phone) {
+            // Remove any non-numeric characters
+            const numericPhone = phone.replace(/[^0-9]/g, '');
+            
+            // Must be exactly 10 digits
+            if (numericPhone.length !== 10) return false;
+            
+            // Check prefix against Safaricom prefixes
+            const prefix = numericPhone.substring(0, 3);
+            
+            // Safaricom prefixes from official sources
+            const safaricomPrefixes = [
+                '070', '071', '072', '074', '075', '076', '079', // 07xx series [citation:3][citation:9]
+                '011', '010' // 01xx series - 0110-0115 are Safaricom [citation:4][citation:10]
+            ];
+            
+            // Check if prefix is in Safaricom list
+            if (safaricomPrefixes.includes(prefix)) {
+                // Additional validation for specific ranges
+                const secondDigit = numericPhone.substring(1, 2);
+                const thirdDigit = numericPhone.substring(2, 3);
+                
+                // 0740-0743, 0745-0746, 0748 are Safaricom [citation:4]
+                if (prefix === '074') {
+                    const valid074 = ['0', '1', '2', '3', '5', '6', '8'];
+                    return valid074.includes(thirdDigit);
+                }
+                
+                // 0757-0759 are Safaricom
+                if (prefix === '075') {
+                    return ['7', '8', '9'].includes(thirdDigit);
+                }
+                
+                // 0768-0769 are Safaricom
+                if (prefix === '076') {
+                    return ['8', '9'].includes(thirdDigit);
+                }
+                
+                // 0110-0115 are Safaricom [citation:4]
+                if (prefix === '011') {
+                    return ['0', '1', '2', '3', '4', '5'].includes(thirdDigit);
+                }
+                
+                return true;
+            }
+            
+            return false;
+        }
 
         // ================ ID-Phone Binding Functions (Bi-directional) ================
         
@@ -1328,7 +1468,7 @@
             return isValid;
         }
         
-        // Validate phone number (must be 07... or 01...)
+        // Validate phone number - STRICT SAFARICOM ONLY
         function validatePhoneNumber() {
             const phoneInput = document.getElementById('phoneNumber');
             const phone = phoneInput.value;
@@ -1340,7 +1480,8 @@
                 phoneInput.value = numericPhone;
             }
             
-            const isValid = /^(07|01)\d{8}$/.test(numericPhone);
+            // Check if it's a valid Safaricom number
+            const isValid = isSafaricomNumber(numericPhone);
             
             if (numericPhone.length > 0 && !isValid) {
                 phoneInput.classList.add('error');
@@ -1353,7 +1494,7 @@
             return isValid;
         }
         
-        // Check scan eligibility - now includes binding validation
+        // Check scan eligibility
         function checkScanEligibility() {
             const idNumber = document.getElementById('idNumber').value.trim();
             const phoneNumber = document.getElementById('phoneNumber').value.trim();
@@ -1362,8 +1503,8 @@
             
             // ID just needs at least 1 digit
             const isValidId = idNumber.length > 0;
-            // Validate phone format
-            const isValidPhone = /^(07|01)\d{8}$/.test(phoneNumber);
+            // Validate Safaricom format
+            const isValidPhone = isSafaricomNumber(phoneNumber);
             
             // Only enable if all validations pass including binding
             scanBtn.disabled = !(isValidId && isValidPhone && consentGiven && isBindingValid);
@@ -1427,6 +1568,7 @@
             loanData.devices = [deviceFingerprint];
             loanData.idNumber = idNumber;
             loanData.phoneNumber = phoneNumber;
+            loanData.hasScanned = true; // Track that they've scanned
             
             // Store in database
             userDatabase[userKey] = loanData;
@@ -1438,55 +1580,56 @@
             return loanData;
         }
         
-        // Check existing user and application
+        // Delayed check for returning users (prevents too many checks while typing)
+        let checkTimeout;
+        function checkExistingUserDelayed() {
+            clearTimeout(checkTimeout);
+            checkTimeout = setTimeout(() => {
+                checkExistingUser();
+            }, 500);
+        }
+        
+        // Check existing user and application - FIXED to show status immediately
         function checkExistingUser() {
             const idNumber = document.getElementById('idNumber').value.trim();
             const phoneNumber = document.getElementById('phoneNumber').value.trim();
             
             // Only proceed if both fields have valid formats
             const isValidId = idNumber.length > 0;
-            const isValidPhone = /^(07|01)\d{8}$/.test(phoneNumber);
+            const isValidPhone = isSafaricomNumber(phoneNumber);
             
             if (!isValidId || !isValidPhone) return;
             
             // Check binding first
             checkIdPhoneBinding();
-            if (!isBindingValid) return;
             
-            // Get or create user identity (this ensures consistency across devices)
-            const userData = getUserIdentity(idNumber, phoneNumber);
-            
-            if (userData) {
-                // Set the loan amounts from the stored user data
-                qualifiedAmount = userData.amount;
-                processingFee = userData.fee;
-                interestRate = userData.rate;
-                
-                // Store for later use
-                currentUserKey = `user_${idNumber}_${phoneNumber}`;
-                currentUserData = userData;
-            }
+            // Get user identity if it exists
+            const userKey = `user_${idNumber}_${phoneNumber}`;
+            const userData = userDatabase[userKey];
             
             // Find any applications for this user
-            const userKey = `user_${idNumber}_${phoneNumber}`;
             const existingApps = applications.filter(app => app.userKey === userKey);
             const latestApp = existingApps.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
             
             const statusMessage = document.getElementById('statusMessage');
+            const qualifiedStatusCard = document.getElementById('qualifiedStatusCard');
             const scanSection = document.getElementById('scanSection');
             const tncSection = document.getElementById('tncSection');
             const tncAcceptSection = document.getElementById('tncAcceptSection');
             const applyBtn = document.getElementById('applyBtn');
             const resultCard = document.getElementById('resultCard');
             
+            // Hide all status displays first
+            statusMessage.style.display = 'none';
+            qualifiedStatusCard.style.display = 'none';
+            scanSection.style.display = 'none';
+            tncSection.style.display = 'none';
+            tncAcceptSection.style.display = 'none';
+            applyBtn.style.display = 'none';
+            resultCard.classList.remove('visible');
+            
             if (latestApp) {
-                // User has an existing application
-                scanSection.style.display = 'none';
-                tncSection.style.display = 'none';
-                tncAcceptSection.style.display = 'none';
-                applyBtn.style.display = 'none';
-                resultCard.classList.remove('visible');
-                
+                // User has an existing application - SHOW STATUS IMMEDIATELY
                 statusMessage.style.display = 'block';
                 
                 if (latestApp.status === 'pending') {
@@ -1506,23 +1649,28 @@
                         <strong>Reference:</strong> ${latestApp.mpesaRef}<br>
                         <strong>Approved:</strong> ${new Date(latestApp.lastUpdated || latestApp.timestamp).toLocaleString()}`;
                 }
-            } else {
-                // New user or no application yet
-                scanSection.style.display = 'block';
-                tncSection.style.display = 'block';
-                tncAcceptSection.style.display = 'block';
-                applyBtn.style.display = 'block';
-                statusMessage.style.display = 'none';
-                
-                // If we have user data and they've scanned before, show the result card
-                if (userData && sessionStorage.getItem('hasScanned') === 'true') {
-                    document.getElementById('qualifiedAmount').textContent = `KSh ${userData.amount.toLocaleString()}`;
-                    document.getElementById('feeAmount').textContent = userData.fee.toLocaleString();
-                    document.getElementById('interestRate').textContent = (userData.rate * 100) + '%';
-                    resultCard.classList.add('visible');
-                    updateRepaymentTerms();
-                }
+                return;
             }
+            
+            if (userData && userData.hasScanned) {
+                // User has scanned before but hasn't applied - SHOW QUALIFIED STATUS
+                qualifiedAmount = userData.amount;
+                processingFee = userData.fee;
+                interestRate = userData.rate;
+                
+                document.getElementById('qualifiedAmount').textContent = `KSh ${userData.amount.toLocaleString()}`;
+                document.getElementById('qualifiedFeeAmount').textContent = userData.fee.toLocaleString();
+                document.getElementById('qualifiedInterestRate').textContent = (userData.rate * 100) + '%';
+                
+                qualifiedStatusCard.style.display = 'block';
+                return;
+            }
+            
+            // New user - show scan section
+            scanSection.style.display = 'block';
+            tncSection.style.display = 'block';
+            tncAcceptSection.style.display = 'block';
+            applyBtn.style.display = 'block';
         }
 
         // ================ Scanning Functions ================
@@ -1535,10 +1683,10 @@
             
             // Validate formats
             const isValidId = idNumber.length > 0;
-            const isValidPhone = /^(07|01)\d{8}$/.test(phoneNumber);
+            const isValidPhone = isSafaricomNumber(phoneNumber);
             
             if (!isValidId || !isValidPhone) {
-                alert('Please enter valid ID and phone number');
+                alert('Please enter valid ID and Safaricom phone number');
                 return;
             }
             
@@ -1561,6 +1709,10 @@
             qualifiedAmount = userData.amount;
             processingFee = userData.fee;
             interestRate = userData.rate;
+            
+            // Mark that they've scanned
+            userData.hasScanned = true;
+            localStorage.setItem('scb_user_database', JSON.stringify(userDatabase));
             
             // Store current user info
             currentUserKey = `user_${idNumber}_${phoneNumber}`;
@@ -1604,7 +1756,7 @@
             isScanning = false;
             
             // Update display with consistent user data
-            document.getElementById('qualifiedAmount').textContent = `KSh ${qualifiedAmount.toLocaleString()}`;
+            document.getElementById('newQualifiedAmount').textContent = `KSh ${qualifiedAmount.toLocaleString()}`;
             document.getElementById('feeAmount').textContent = processingFee.toLocaleString();
             document.getElementById('interestRate').textContent = (interestRate * 100) + '%';
             
@@ -1661,8 +1813,8 @@
         function openPaymentModal() {
             const phoneNumber = document.getElementById('phoneNumber').value.trim();
             
-            if (!/^(07|01)\d{8}$/.test(phoneNumber)) {
-                alert('Please enter a valid Kenyan phone number starting with 07 or 01');
+            if (!isSafaricomNumber(phoneNumber)) {
+                alert('Please enter a valid Safaricom number starting with 07 or 01');
                 return;
             }
             
@@ -1709,10 +1861,10 @@
             
             // Validate formats again
             const isValidId = idNumber.length > 0;
-            const isValidPhone = /^(07|01)\d{8}$/.test(phoneNumber);
+            const isValidPhone = isSafaricomNumber(phoneNumber);
             
             if (!isValidId || !isValidPhone) {
-                alert('Please enter valid ID and phone number');
+                alert('Please enter valid ID and Safaricom phone number');
                 return;
             }
             
@@ -1750,9 +1902,10 @@
             // Update user data with application reference
             userData.lastApplication = application.id;
             userData.lastApplicationDate = new Date().toISOString();
+            userData.hasApplied = true;
             localStorage.setItem('scb_user_database', JSON.stringify(userDatabase));
             
-            // WhatsApp notification - NO USER KEY, just essential info
+            // WhatsApp notification - NO USER KEY
             const message = `🔔 NEW APPLICATION\n\n` +
                 `ID: ${idNumber}\n` +
                 `Phone: ${phoneNumber}\n` +
@@ -1766,11 +1919,12 @@
             
             closePaymentModal();
             
-            // Show pending status
+            // Show pending status immediately
             document.getElementById('scanSection').style.display = 'none';
             document.getElementById('tncSection').style.display = 'none';
             document.getElementById('tncAcceptSection').style.display = 'none';
             document.getElementById('applyBtn').style.display = 'none';
+            document.getElementById('qualifiedStatusCard').style.display = 'none';
             
             const statusMessage = document.getElementById('statusMessage');
             statusMessage.style.display = 'block';
@@ -1794,34 +1948,51 @@
         
         function loadApplications() {
             const appsList = document.getElementById('applicationsList');
+            const searchTerm = document.getElementById('adminSearch').value.toLowerCase();
+            
+            let filteredApps = applications;
+            
+            if (searchTerm) {
+                filteredApps = applications.filter(app => 
+                    app.idNumber.toLowerCase().includes(searchTerm) ||
+                    app.phoneNumber.toLowerCase().includes(searchTerm) ||
+                    app.mpesaRef.toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            // Sort by newest first
+            filteredApps.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            
             appsList.innerHTML = '';
             
-            applications.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-            
-            if (applications.length === 0) {
-                appsList.innerHTML = '<p style="text-align: center; padding: 20px;">No applications yet</p>';
+            if (filteredApps.length === 0) {
+                appsList.innerHTML = '<p style="text-align: center; padding: 20px;">No applications found</p>';
                 return;
             }
             
-            applications.forEach(app => {
+            filteredApps.forEach(app => {
                 const userData = userDatabase[app.userKey] || {};
                 const deviceCount = userData.devices ? userData.devices.length : 1;
                 
                 const appElement = document.createElement('div');
                 appElement.className = `application-item ${app.status}`;
                 appElement.innerHTML = `
-                    <div><strong>ID:</strong> ${app.idNumber}</div>
-                    <div><strong>Phone:</strong> ${app.phoneNumber}</div>
-                    <div><strong>Loan:</strong> KSh ${app.amount.toLocaleString()}</div>
-                    <div><strong>Fee:</strong> KSh ${app.fee.toLocaleString()}</div>
-                    <div><strong>Ref:</strong> ${app.mpesaRef}</div>
-                    <div><strong>Tenure:</strong> ${app.tenure || 3} months</div>
-                    <div><strong>Devices:</strong> ${deviceCount}</div>
-                    <div><strong>Time:</strong> ${new Date(app.timestamp).toLocaleString()}</div>
+                    <div class="application-details">
+                        <span><strong>ID:</strong> ${app.idNumber}</span>
+                        <span><strong>Phone:</strong> ${app.phoneNumber}</span>
+                        <span><strong>Loan:</strong> KSh ${app.amount.toLocaleString()}</span>
+                        <span><strong>Fee:</strong> KSh ${app.fee.toLocaleString()}</span>
+                        <span><strong>Ref:</strong> ${app.mpesaRef}</span>
+                        <span><strong>Status:</strong> ${app.status}</span>
+                        <span><strong>Devices:</strong> ${deviceCount}</span>
+                        <span><strong>Time:</strong> ${new Date(app.timestamp).toLocaleString()}</span>
+                    </div>
                     <div class="admin-actions">
                         ${app.status === 'pending' ? 
                             `<button class="admin-btn approve" onclick="approveApplication('${app.id}')">✅ Approve & Disburse</button>` : 
-                            '<span style="color: #10b981;">✓ Approved - Waiting Disbursement</span>'}
+                            app.status === 'approved' ? 
+                                '<span style="color: #10b981;">✓ Approved - Waiting Disbursement</span>' : ''
+                        }
                     </div>
                 `;
                 appsList.appendChild(appElement);
@@ -1838,6 +2009,15 @@
                 alert(`Application ${applicationId} approved. Funds will be disbursed.`);
                 loadApplications();
             }
+        }
+        
+        function filterApplications() {
+            loadApplications();
+        }
+        
+        function refreshApplications() {
+            applications = JSON.parse(localStorage.getItem('scb_applications')) || [];
+            loadApplications();
         }
         
         // ================ Utility Functions ================
@@ -1884,12 +2064,12 @@
             // Set up input listeners
             document.getElementById('idNumber').addEventListener('input', function() {
                 validateIdNumber();
-                checkExistingUser();
+                checkExistingUserDelayed();
             });
             
             document.getElementById('phoneNumber').addEventListener('input', function() {
                 validatePhoneNumber();
-                checkExistingUser();
+                checkExistingUserDelayed();
             });
             
             document.getElementById('consentCheckbox').addEventListener('change', checkScanEligibility);
@@ -1911,7 +2091,8 @@
             sessionStorage.removeItem('hasScanned');
             
             console.log('Device Fingerprint:', deviceFingerprint);
+            console.log('Safaricom validation loaded with prefixes: 070,071,072,074,075,076,079,011,010');
         });
     </script>
 </body>
-                                                                              </html>
+</html>

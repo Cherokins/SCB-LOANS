@@ -1767,7 +1767,7 @@
                         `Your application for KSh ${latestApp.amount.toLocaleString()} was declined.<br>
                         <strong>Reference:</strong> ${latestApp.mpesaRef}<br>
                         <strong>Declined:</strong> ${new Date(latestApp.lastUpdated || latestApp.timestamp).toLocaleString()}<br>
-                        You can try again with the same loan offer.`;
+                        Note: You qualify for this loan offer - Try again.`;
                     
                     // Store declined application ID for retry
                     declinedApplicationId = latestApp.id;

